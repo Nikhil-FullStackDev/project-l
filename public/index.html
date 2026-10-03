@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#15171e">
+  <meta name="description" content="Project L — a puzzle-piece engine-building board game. Play online with friends, against bots, or pass and play.">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Project L</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icon.svg">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="modulepreload" href="/js/board.js">
+  <link rel="modulepreload" href="/shared/engine.js">
+  <script type="module" src="/js/app.js"></script>
+</head>
+<body data-screen="home">
+  <div id="home" class="screen">
+    <div class="card">
+      <div class="logo" aria-hidden="true"><i class="s-4L"></i><i></i><i class="s-4L"></i><i></i><i class="s-4L"></i><i class="s-4L"></i></div>
+      <h1>Project L</h1>
+      <p class="muted">Collect pieces, complete puzzles, build your engine.</p>
+      <label class="field"><span>Your name</span><input id="name" maxlength="16" autocomplete="nickname" placeholder="Player" enterkeyhint="done"></label>
+      <button id="create" class="btn primary block">Create online game</button>
+      <form id="join-form" class="join">
+        <input id="code" maxlength="4" placeholder="CODE" autocapitalize="characters" autocomplete="off" spellcheck="false" aria-label="Room code" enterkeyhint="go">
+        <button class="btn">Join</button>
+      </form>
+      <div class="or"><span>or</span></div>
+      <button id="offline-btn" class="btn block">Play offline (bots / pass &amp; play)</button>
+      <button id="resume-offline" class="btn block ghost hidden">Resume offline game</button>
+    </div>
+    <div id="home-toast" class="toast hidden"></div>
+  </div>
+
+  <div id="lobby" class="screen hidden">
+    <div class="card">
+      <p class="muted">Room code</p>
+      <div id="lobby-code" class="code big"></div>
+      <button id="lobby-share" class="btn block">Share invite link</button>
+      <ul id="lobby-players" class="seats"></ul>
+      <p id="lobby-hint" class="muted small"></p>
+      <button id="lobby-add" class="btn block">+ Add bot</button>
+      <button id="lobby-start" class="btn primary block">Start game</button>
+      <p id="lobby-wait" class="muted">Waiting for the host to start…</p>
+      <button id="lobby-leave" class="btn block ghost">Leave</button>
+    </div>
+  </div>
+
+  <div id="offline" class="screen hidden">
+    <div class="card">
+      <h2>Offline game</h2>
+      <p class="muted small">Play against bots, or add humans and pass the device around.</p>
+      <ul id="seats" class="seats"></ul>
+      <div class="two">
+        <button id="add-bot" class="btn">+ Bot</button>
+        <button id="add-human" class="btn">+ Human</button>
+      </div>
+      <button id="offline-start" class="btn primary block">Start</button>
+      <button id="offline-back" class="btn block ghost">Back</button>
+    </div>
+  </div>
+
+  <div id="play" class="hidden"></div>
+  <div id="conn" class="conn hidden">Reconnecting…</div>
+</body>
+</html>

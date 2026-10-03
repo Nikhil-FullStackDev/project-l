@@ -308,3 +308,10 @@ input:focus { outline: 2px solid var(--accent); outline-offset: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* iOS Safari only fires click on elements that look clickable */
+.pz-grid i, .pz, .tp, .opp, [data-take], [data-own] { cursor: pointer; }
+/* Closed side panel must not exist in layout on phones (iOS scrolls to off-screen fixed elements) */
+@media (max-width: 999px) {
+  .side:not(.open) { display: none; }
+}

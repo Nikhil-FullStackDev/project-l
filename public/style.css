@@ -181,8 +181,8 @@ input:focus { outline: 2px solid var(--accent); outline-offset: 0; }
 .pz-grid .bb { border-bottom-color: var(--edge); }
 .pz-grid .bl { border-left-color: var(--edge); }
 .pz-grid .pend { opacity: .6; outline: 1px dashed #fff8; outline-offset: -2px; }
-.pz-grid .g-ok { background: var(--c); opacity: .75; }
-.pz-grid .g-bad { background: var(--bad); opacity: .7; }
+.pz .pz-grid i.g-ok { background: var(--c); opacity: .9; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .35), 0 0 0 2px #fff; z-index: 1; position: relative; }
+.pz .pz-grid i.g-bad { background: var(--bad); opacity: .85; box-shadow: 0 0 0 2px #fff; z-index: 1; position: relative; }
 .pz-meta { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 6px; min-height: 16px; }
 .pts { font-size: 14px; font-weight: 800; }
 .pts::before { content: "★"; font-size: 11px; margin-right: 1px; opacity: .7; }

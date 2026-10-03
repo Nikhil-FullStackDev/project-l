@@ -301,17 +301,17 @@ export function createBoard(root, api) {
     return cells.slice().sort((a, b) => Math.hypot(a[0] - cx, a[1] - cy) - Math.hypot(b[0] - cx, b[1] - cy));
   }
 
+  // The tapped cell always holds the piece's anchor (its center-most square), so the
+  // piece lands exactly where the player points instead of jumping to another fit.
+  const anchorOf = (cells) => anchorOrder(cells)[0];
+
   function computePreview(pi, hx, hy) {
     const pz = me().puzzles[pi];
     if (!pz || !sel) return null;
     if (mode === 'master' && pending.some((p) => p.puzzle === pi)) return { puzzle: pi, cells: [[hx, hy]], ok: false };
-    let first = null;
-    for (const [ax, ay] of anchorOrder(sel.cells)) {
-      const cells = sel.cells.map(([x, y]) => [x - ax + hx, y - ay + hy]);
-      if (!first) first = cells;
-      if (!checkPlacement(pz, sel.shape, cells)) return { puzzle: pi, cells, ok: true, hx, hy };
-    }
-    return { puzzle: pi, cells: first, ok: false, hx, hy };
+    const [ax, ay] = anchorOf(sel.cells);
+    const cells = sel.cells.map(([x, y]) => [x - ax + hx, y - ay + hy]);
+    return { puzzle: pi, cells, ok: !checkPlacement(pz, sel.shape, cells), hx, hy };
   }
 
   function clearPreviewCells() {
@@ -472,6 +472,76 @@ export function createBoard(root, api) {
   });
 
   el.mine.addEventListener('contextmenu', (e) => { if (sel) { e.preventDefault(); transformSel(rotate); } });
+
+  // Touch drag: press and hold a tray piece, move it over a puzzle, release to place.
+  let drag = null; // { shape, timer, x0, y0, ghost, active }
+  const DRAG_LIFT = 70; // piece floats above the finger so it stays visible
+
+  function dragCellSize() {
+    const c = el.mine.querySelector('.pz-grid i');
+    return c ? c.getBoundingClientRect().width : 28;
+  }
+  function dragMove(x, y) {
+    const tx = x, ty = y - DRAG_LIFT;
+    const cs = dragCellSize();
+    const [ax, ay] = anchorOf(sel.cells);
+    drag.ghost.style.setProperty('--pc', cs + 'px');
+    drag.ghost.style.transform = `translate(${tx - (ax + 0.5) * cs}px, ${ty - (ay + 0.5) * cs}px)`;
+    const under = document.elementFromPoint(tx, ty);
+    const cell = under && under.closest('.my-puzzles [data-i]');
+    const card = cell && cell.closest('[data-own]');
+    if (!cell || !card) { if (preview) setPreview(null); return; }
+    const i = +cell.dataset.i, pi = +card.dataset.own;
+    if (preview && preview.puzzle === pi && preview.hx === i % GRID && preview.hy === ((i / GRID) | 0)) return;
+    setPreview(computePreview(pi, i % GRID, (i / GRID) | 0));
+  }
+  function dragEnd(commit) {
+    if (!drag) return;
+    clearTimeout(drag.timer);
+    if (drag.ghost) drag.ghost.remove();
+    const wasActive = drag.active;
+    drag = null;
+    if (!wasActive) return;
+    if (commit && preview && preview.ok) commitPreview();
+    else if (preview) { if (commit) toast("Doesn't fit there"); setPreview(null); }
+  }
+  el.tray.addEventListener('touchstart', (e) => {
+    const b = e.target.closest('[data-piece]');
+    if (!b || e.touches.length > 1 || mode === 'upgrade' || !placing()) return;
+    const shape = b.dataset.piece;
+    if (avail(shape) <= 0) return;
+    const t = e.touches[0];
+    drag = { shape, x0: t.clientX, y0: t.clientY, active: false, ghost: null };
+    drag.timer = setTimeout(() => {
+      if (!drag) return;
+      if (!sel || sel.shape !== shape) { sel = { shape, cells: NORM[shape] }; renderDock(); renderMine(); }
+      drag.active = true;
+      drag.ghost = document.createElement('div');
+      drag.ghost.className = 'drag-ghost';
+      drag.ghost.innerHTML = pieceHTML(shape, sel.cells);
+      document.body.appendChild(drag.ghost);
+      if (navigator.vibrate) try { navigator.vibrate(15); } catch { /* ignore */ }
+      dragMove(drag.x0, drag.y0);
+    }, 220);
+  }, { passive: true });
+  document.addEventListener('touchmove', (e) => {
+    if (!drag) return;
+    const t = e.touches[0];
+    if (!drag.active) {
+      // Moved before the hold fired: it's a scroll of the tray, not a drag.
+      if (Math.hypot(t.clientX - drag.x0, t.clientY - drag.y0) > 10) dragEnd(false);
+      return;
+    }
+    e.preventDefault();
+    dragMove(t.clientX, t.clientY);
+  }, { passive: false });
+  document.addEventListener('touchend', (e) => {
+    if (!drag) return;
+    if (drag.active) e.preventDefault(); // no synthetic click after a drag
+    dragEnd(true);
+  }, { passive: false });
+  document.addEventListener('touchcancel', () => dragEnd(false));
+  el.tray.addEventListener('contextmenu', (e) => e.preventDefault());
 
   el.tray.addEventListener('click', (e) => {
     const b = e.target.closest('[data-piece]');

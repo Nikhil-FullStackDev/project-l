@@ -52,7 +52,11 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-radius: 4
 
 .pc { display: inline-grid; grid-template-columns: repeat(var(--w), var(--pc, 10px)); grid-auto-rows: var(--pc, 10px); gap: 1px; vertical-align: middle; }
 .pc i, .logo i, .pz-grid .f { background: var(--c); }
-.pc i { border-radius: 2px; }
+.pc i { border-radius: 2px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .35); }
+.pz-grid .f, .pz-grid .g-ok { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .3); }
+.drag-ghost { position: fixed; left: 0; top: 0; z-index: 70; pointer-events: none; opacity: .9; filter: drop-shadow(0 6px 12px #000a); }
+.drag-ghost .pc { gap: 0; }
+.tp { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .pc i:not([class]) { visibility: hidden; }
 
 /* ---------------------------------------------------------------- buttons */

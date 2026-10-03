@@ -244,7 +244,10 @@ export function createBoard(root, api) {
     let c = '', hint = '';
     if (sel && placing()) {
       c += b('rot', '⟳', { cls: 'sq' }) + b('flip', '⇋', { cls: 'sq' }) + b('desel', '✕', { cls: 'sq' });
-      if (preview && preview.ok && preview.touch) c += b('place', '✓ Place', { cls: 'primary' });
+      if (preview && preview.touch) {
+        c += b('unplace', '↺ Remove');
+        c += b('place', '✓ Confirm', { cls: 'primary', dis: !preview.ok });
+      }
     }
     if (g.phase === 'ended') {
       hint = 'Game over';
@@ -497,13 +500,15 @@ export function createBoard(root, api) {
   }
   function dragEnd(commit) {
     if (!drag) return;
-    clearTimeout(drag.timer);
     if (drag.ghost) drag.ghost.remove();
     const wasActive = drag.active;
     drag = null;
     if (!wasActive) return;
-    if (commit && preview && preview.ok) commitPreview();
-    else if (preview) { if (commit) toast("Doesn't fit there"); setPreview(null); }
+    // Leave the piece on the puzzle for the player to confirm, move again, or remove.
+    if (commit && preview) {
+      setPreview(preview, true);
+      if (!preview.ok) toast("Doesn't fit there — move it or remove it");
+    }
   }
   el.tray.addEventListener('touchstart', (e) => {
     const b = e.target.closest('[data-piece]');
@@ -512,25 +517,26 @@ export function createBoard(root, api) {
     if (avail(shape) <= 0) return;
     const t = e.touches[0];
     drag = { shape, x0: t.clientX, y0: t.clientY, active: false, ghost: null };
-    drag.timer = setTimeout(() => {
-      if (!drag) return;
-      if (!sel || sel.shape !== shape) { sel = { shape, cells: NORM[shape] }; renderDock(); renderMine(); }
-      drag.active = true;
-      drag.ghost = document.createElement('div');
-      drag.ghost.className = 'drag-ghost';
-      drag.ghost.innerHTML = pieceHTML(shape, sel.cells);
-      document.body.appendChild(drag.ghost);
-      if (navigator.vibrate) try { navigator.vibrate(15); } catch { /* ignore */ }
-      dragMove(drag.x0, drag.y0);
-    }, 220);
   }, { passive: true });
+  function dragStart() {
+    const shape = drag.shape;
+    if (!sel || sel.shape !== shape) { sel = { shape, cells: NORM[shape] }; renderDock(); renderMine(); }
+    drag.active = true;
+    drag.ghost = document.createElement('div');
+    drag.ghost.className = 'drag-ghost';
+    drag.ghost.innerHTML = pieceHTML(shape, sel.cells);
+    document.body.appendChild(drag.ghost);
+    if (navigator.vibrate) try { navigator.vibrate(15); } catch { /* ignore */ }
+  }
   document.addEventListener('touchmove', (e) => {
     if (!drag) return;
     const t = e.touches[0];
     if (!drag.active) {
-      // Moved before the hold fired: it's a scroll of the tray, not a drag.
-      if (Math.hypot(t.clientX - drag.x0, t.clientY - drag.y0) > 10) dragEnd(false);
-      return;
+      const dx = t.clientX - drag.x0, dy = t.clientY - drag.y0;
+      if (Math.hypot(dx, dy) < 8) return;
+      // Sideways swipe scrolls the tray; moving up/down drags the piece.
+      if (Math.abs(dx) > Math.abs(dy)) { dragEnd(false); return; }
+      dragStart();
     }
     e.preventDefault();
     dragMove(t.clientX, t.clientY);
@@ -597,6 +603,7 @@ export function createBoard(root, api) {
       case 'flip': return transformSel(flip);
       case 'desel': sel = null; preview = null; renderDock(); return renderMine();
       case 'place': return commitPreview();
+      case 'unplace': return setPreview(null);
       case 'take1': return send({ type: 'takePiece' });
       case 'pass': return send({ type: 'pass' });
       case 'upgrade': sel = null; preview = null; mode = 'upgrade'; renderDock(); return renderMine();

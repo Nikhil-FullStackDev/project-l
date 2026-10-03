@@ -431,7 +431,7 @@ export function createBoard(root, api) {
   const isTouch = (e) => e.pointerType && e.pointerType !== 'mouse';
 
   el.mine.addEventListener('pointermove', (e) => {
-    if (isTouch(e) || !sel || !placing()) return;
+    if (isTouch(e) || matchMedia('(hover: none)').matches || !sel || !placing()) return;
     const cell = e.target.closest('[data-i]');
     const card = e.target.closest('[data-own]');
     if (!cell || !card) return;
@@ -460,13 +460,14 @@ export function createBoard(root, api) {
     if (!placing() || !cell) return;
     const i = +cell.dataset.i;
     const hx = i % GRID, hy = (i / GRID) | 0;
-    const touch = e.pointerType ? e.pointerType !== 'mouse' : matchMedia('(pointer: coarse)').matches;
+    const touch = matchMedia('(hover: none)').matches || (e.pointerType && e.pointerType !== 'mouse');
     if (touch) {
-      // First tap previews; tapping the preview again places it.
-      const inPreview = preview && preview.puzzle === pi && preview.ok && preview.cells.some(([x, y]) => x === hx && y === hy);
-      if (inPreview) return commitPreview();
-      setPreview(computePreview(pi, hx, hy), true);
-      if (preview && !preview.ok) toast("Doesn't fit there — try rotating");
+      // A tap only shows the piece there; the player decides with Confirm or Remove.
+      preview = computePreview(pi, hx, hy);
+      if (preview) preview.touch = true;
+      renderMine();
+      renderDock();
+      if (preview && !preview.ok) toast("Doesn't fit there — try another spot or rotate");
     } else {
       if (!preview || preview.puzzle !== pi || preview.hx !== hx || preview.hy !== hy) setPreview(computePreview(pi, hx, hy));
       if (preview && preview.ok) commitPreview();

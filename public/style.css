@@ -19,7 +19,8 @@
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; }
+html, body { margin: 0; height: 100%; overflow-x: hidden; max-width: 100%; }
+@supports (overflow: clip) { html, body { overflow-x: clip; } }
 body {
   background: var(--bg);
   color: var(--text);
@@ -116,7 +117,9 @@ input:focus { outline: 2px solid var(--accent); outline-offset: 0; }
 .conn { position: fixed; top: calc(8px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 60; background: var(--bad); color: #fff; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; }
 
 /* ---------------------------------------------------------------- game layout */
-#play { height: 100dvh; }
+#play { height: 100dvh; overflow: hidden; }
+.game { overflow: hidden; max-width: 100vw; }
+.screen { overflow-x: hidden; }
 .game {
   height: 100%;
   display: grid;
@@ -245,7 +248,8 @@ input:focus { outline: 2px solid var(--accent); outline-offset: 0; }
   display: flex; flex-direction: column; gap: 10px;
   padding: max(8px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
 }
-.side.open { transform: none; }
+.side { visibility: hidden; }
+.side.open { transform: none; visibility: visible; }
 .side-h { display: flex; justify-content: space-between; align-items: center; }
 .sup-grid { --pc: 9px; display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; }
 .sup { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 8px; background: var(--panel2); border-radius: 8px; font-size: 13px; font-weight: 700; min-height: 36px; }
@@ -293,7 +297,7 @@ input:focus { outline: 2px solid var(--accent); outline-offset: 0; }
     grid-template-columns: 1fr 320px;
     grid-template-areas: "top top" "board side" "dock side";
   }
-  .side { position: static; transform: none; width: auto; box-shadow: none; grid-area: side; padding-top: 12px; }
+  .side { visibility: visible; position: static; transform: none; width: auto; box-shadow: none; grid-area: side; padding-top: 12px; }
   .only-mobile, [data-ui="side"] { display: none; }
   .my-puzzles { --cell: clamp(22px, calc((100vw - 460px) / 22), 36px); }
   .sheet-wrap { align-items: center; }

@@ -4,6 +4,7 @@ import { chooseAction } from '../shared/bot.js';
 
 const MAX_ROOMS = 1000;
 const MAX_PLAYERS = 4;
+const MAX_SPECTATORS = 30;
 const BOT_DELAY = 650; // ms between bot actions so humans can follow along
 const DISCONNECT_GRACE = 30_000; // a bot plays for a disconnected player after this
 const IDLE_TTL = 30 * 60_000;
@@ -134,7 +135,7 @@ export class Rooms {
     return r;
   }
 
-  attach(ws, room, player) {
+  attach(ws, room, player, name) {
     this.detach(ws);
     if (player) {
       if (player.ws && player.ws !== ws) {
@@ -145,11 +146,13 @@ export class Rooms {
       player.ws = ws;
       player.connected = true;
     } else {
+      if (room.spectators.size >= MAX_SPECTATORS) fail('Too many spectators in this room');
       room.spectators.add(ws);
+      ws.name = name;
     }
     ws.room = room;
     ws.pid = player ? player.id : null;
-    send(ws, { t: 'welcome', code: room.code, pid: ws.pid, token: player ? player.token : null });
+    send(ws, { t: 'welcome', code: room.code, pid: ws.pid, token: player ? player.token : null, watch: !player });
     room.broadcastRoom();
     if (room.game) send(ws, { t: 'state', game: publicView(room.game) });
     room.schedule();
@@ -186,7 +189,8 @@ export class Rooms {
       case 'join': {
         const r = this.get(msg.code);
         r.lastActive = Date.now();
-        if (r.game || r.players.length >= MAX_PLAYERS) return this.attach(ws, r, null); // spectate
+        // "Watch" asks to spectate; a started or full room can only be watched.
+        if (msg.watch === true || r.game || r.players.length >= MAX_PLAYERS) return this.attach(ws, r, null, cleanName(msg.name));
         return this.attach(ws, r, r.addPlayer(cleanName(msg.name)));
       }
       case 'resume': {
@@ -242,7 +246,7 @@ export class Rooms {
         const text = String(msg.text || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 200);
         const p = room.players.find((x) => x.id === ws.pid);
         if (!text) return;
-        return room.broadcast({ t: 'chat', name: p ? p.name : 'Spectator', text });
+        return room.broadcast({ t: 'chat', name: p ? p.name : '👁 ' + (ws.name || 'Spectator'), text });
       }
       default: fail('Unknown message');
     }

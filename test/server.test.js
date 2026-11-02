@@ -104,3 +104,40 @@ test('bad resume token is rejected', async () => {
   await a.next((m) => m.t === 'resumeFailed');
   a.ws.close();
 });
+
+test('watching: a spectator can join any room (even with free seats), chats, cannot play, and is capped', async () => {
+  const a = client(); await a.open();
+  a.send({ t: 'create', name: 'Alice' });
+  const wa = await a.next((m) => m.t === 'welcome');
+
+  // The room is still a lobby with free seats: Watch does not take one.
+  const w = client(); await w.open();
+  w.send({ t: 'join', code: wa.code.toLowerCase(), name: 'Eve', watch: true });
+  const ww = await w.next((m) => m.t === 'welcome');
+  assert.equal(ww.pid, null); assert.equal(ww.token, null); assert.equal(ww.watch, true);
+  const room = await a.next((m) => m.t === 'room' && m.room.spectators === 1);
+  assert.equal(room.room.players.length, 1, 'a spectator does not take a seat');
+
+  // The game starts: the spectator gets the table, chats with a label, and cannot act.
+  a.send({ t: 'addBot' }); a.send({ t: 'start' });
+  await w.next((m) => m.t === 'state');
+  w.send({ t: 'act', a: { type: 'pass' } });
+  assert.match((await w.next((m) => m.t === 'error')).msg, /Spectators cannot play/);
+  w.send({ t: 'start' });
+  assert.match((await w.next((m) => m.t === 'error')).msg, /host/i);
+  w.send({ t: 'chat', text: 'hello' });
+  const chat = await a.next((m) => m.t === 'chat');
+  assert.equal(chat.name, '\u{1F441} Eve'); assert.equal(chat.text, 'hello');
+
+  // Cap.
+  const extra = [];
+  let refused = null;
+  for (let i = 0; i < 31 && !refused; i++) {
+    const x = client(); await x.open(); extra.push(x);
+    x.send({ t: 'join', code: wa.code, name: 'W' + i, watch: true });
+    const m = await x.next((mm) => mm.t === 'welcome' || mm.t === 'error');
+    if (m.t === 'error') refused = m;
+  }
+  assert.match(refused.msg, /Too many spectators/);
+  for (const x of [a, w, ...extra]) x.ws.close();
+});

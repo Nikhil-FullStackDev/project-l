@@ -242,11 +242,12 @@ export function createBoard(root, api) {
     // controls + hint
     const b = (ui, label, { dis = false, cls = '' } = {}) => `<button class="btn ${cls}" data-ui="${ui}" ${dis ? 'disabled' : ''}>${label}</button>`;
     let c = '', hint = '';
+    const trying = sel && placing() && preview && preview.touch;
     if (sel && placing()) {
       c += b('rot', '⟳', { cls: 'sq' }) + b('flip', '⇋', { cls: 'sq' }) + b('desel', '✕', { cls: 'sq' });
-      if (preview && preview.touch) {
+      if (trying) {
         c += b('unplace', '↺ Remove');
-        c += b('place', '✓ Confirm', { cls: 'primary', dis: !preview.ok });
+        c += b('place', preview.ok ? '✓ Place' : 'Doesn’t fit', { cls: 'primary place', dis: !preview.ok });
       }
     }
     if (g.phase === 'ended') {
@@ -267,7 +268,9 @@ export function createBoard(root, api) {
       hint = 'Upgrade: tap the piece you want to return';
       c += b('cancel', 'Cancel');
     } else {
-      hint = sel ? 'Tap a spot in your puzzle to place' : m.puzzles.length ? 'Pick a piece, take a puzzle, or choose an action' : 'Start by taking a puzzle from the market';
+      hint = trying ? (preview.ok ? 'Drag on the puzzle to move it · ⟳ rotate · ✓ Place' : 'Drag on the puzzle to move it, or ⟳ rotate / ⇋ flip')
+        : sel ? (matchMedia('(hover: none)').matches ? 'Tap a spot in your puzzle — then drag to adjust' : 'Click a spot in your puzzle to place')
+        : m.puzzles.length ? 'Pick a piece, take a puzzle, or choose an action' : 'Start by taking a puzzle from the market';
       if (!sel) {
         c += b('take1', '+1 ' + pieceHTML('1'), { dis: !(g.supply['1'] > 0) });
         c += b('upgrade', '⇧ Upgrade');
@@ -442,7 +445,47 @@ export function createBoard(root, api) {
   });
   el.mine.addEventListener('pointerleave', (e) => { if (!isTouch(e) && preview) setPreview(null); });
 
+  // Touch: drag anywhere on a puzzle to slide the previewed piece around it, cell by cell. The piece follows the
+  // finger's movement (not its position), so the finger never covers it. A drag that never moved is a tap.
+  let pdrag = null; // { id, pi, x0, y0, hx0, hy0, cs, moved }
+  let swallowClick = false;
+  el.mine.addEventListener('pointerdown', (e) => {
+    if (!isTouch(e) || !sel || !placing() || mode === 'upgrade') return;
+    const card = e.target.closest('[data-own]');
+    if (!card) return;
+    const pi = +card.dataset.own;
+    const cell = e.target.closest('[data-i]');
+    let hx, hy;
+    if (preview && preview.puzzle === pi && preview.hx !== undefined) ({ hx, hy } = preview);
+    else if (cell) { const i = +cell.dataset.i; hx = i % GRID; hy = (i / GRID) | 0; }
+    else return;
+    const g0 = card.querySelector('.pz-grid i');
+    pdrag = { id: e.pointerId, pi, x0: e.clientX, y0: e.clientY, hx0: hx, hy0: hy, cs: g0 ? g0.getBoundingClientRect().width : 28, moved: false };
+  });
+  el.mine.addEventListener('pointermove', (e) => {
+    if (!pdrag || e.pointerId !== pdrag.id) return;
+    const dx = e.clientX - pdrag.x0, dy = e.clientY - pdrag.y0;
+    if (!pdrag.moved && Math.hypot(dx, dy) < 8) return;
+    pdrag.moved = true;
+    const clamp = (v) => Math.max(0, Math.min(GRID - 1, v));
+    const hx = clamp(pdrag.hx0 + Math.round(dx / pdrag.cs)), hy = clamp(pdrag.hy0 + Math.round(dy / pdrag.cs));
+    if (preview && preview.puzzle === pdrag.pi && preview.hx === hx && preview.hy === hy) return;
+    setPreview(computePreview(pdrag.pi, hx, hy), true);
+  });
+  const endPdrag = (e) => {
+    if (!pdrag || (e && e.pointerId !== pdrag.id)) return;
+    if (pdrag.moved) {
+      swallowClick = true; // the click that follows a drag must not move the piece again
+      setTimeout(() => { swallowClick = false; }, 400);
+      if (preview) { renderDock(); if (!preview.ok) toast("Doesn't fit there yet — keep dragging, or ⟳ rotate"); }
+    }
+    pdrag = null;
+  };
+  el.mine.addEventListener('pointerup', endPdrag);
+  el.mine.addEventListener('pointercancel', endPdrag);
+
   el.mine.addEventListener('click', (e) => {
+    if (swallowClick) { swallowClick = false; return; }
     const card = e.target.closest('[data-own]');
     if (!card) return;
     const pi = +card.dataset.own;
@@ -467,7 +510,7 @@ export function createBoard(root, api) {
       if (preview) preview.touch = true;
       renderMine();
       renderDock();
-      if (preview && !preview.ok) toast("Doesn't fit there — try another spot or rotate");
+      if (preview && !preview.ok) toast("Doesn't fit there — drag it, tap another spot, or ⟳ rotate");
     } else {
       if (!preview || preview.puzzle !== pi || preview.hx !== hx || preview.hy !== hy) setPreview(computePreview(pi, hx, hy));
       if (preview && preview.ok) commitPreview();

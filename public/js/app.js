@@ -66,7 +66,10 @@ const net = {
       this.retry = 0;
       $('#conn').classList.add('hidden');
       const sess = store.get('pl.session');
-      if (sess && !this.queue.some((m) => m.t === 'create' || m.t === 'join')) ws.send(JSON.stringify({ t: 'resume', ...sess }));
+      if (sess && !this.queue.some((m) => m.t === 'create' || m.t === 'join')) {
+        // a spectator has no seat to resume: watch the same room again
+        ws.send(JSON.stringify(sess.watch ? { t: 'join', code: sess.code, name: sess.name, watch: true } : { t: 'resume', ...sess }));
+      }
       for (const m of this.queue.splice(0)) ws.send(JSON.stringify(m));
     };
     ws.onmessage = (e) => onNet(JSON.parse(e.data));
@@ -105,6 +108,7 @@ function onNet(m) {
       net.code = m.code;
       net.pid = m.pid;
       if (m.token) store.set('pl.session', { code: m.code, token: m.token });
+      else if (m.watch) store.set('pl.session', { code: m.code, watch: true, name: getName() });
       history.replaceState(null, '', `/?room=${m.code}`);
       break;
     case 'resumeFailed':
@@ -134,6 +138,8 @@ function onNet(m) {
       if (board) board.chat(m.name, m.text);
       break;
     case 'error':
+      // a spectator whose room is gone has nothing to come back to
+      if (!net.code && store.get('pl.session')?.watch) net.reset();
       toast(m.msg);
       break;
     case 'kicked':
@@ -164,7 +170,7 @@ function renderLobby() {
   $('#lobby-add').classList.toggle('hidden', !host || r.players.length >= 4);
   $('#lobby-start').classList.toggle('hidden', !host);
   $('#lobby-wait').classList.toggle('hidden', host);
-  $('#lobby-hint').textContent = r.players.length < 2 ? 'Share the code with friends or add bots.' : `${r.players.length}/4 players`;
+  $('#lobby-hint').textContent = !net.pid ? '👁 You\u2019re watching' : r.players.length < 2 ? 'Share the code with friends or add bots.' : `${r.players.length}/4 players`;
 }
 
 $('#create').addEventListener('click', () => { net.reset(); net.send({ t: 'create', name: getName() }); });
@@ -174,6 +180,12 @@ $('#join-form').addEventListener('submit', (e) => {
   if (code.length !== 4) return toast('Enter the 4-letter room code');
   net.reset();
   net.send({ t: 'join', code, name: getName() });
+});
+$('#watch').addEventListener('click', () => {
+  const code = $('#code').value.trim().toUpperCase();
+  if (code.length !== 4) return toast('Enter the 4-letter room code');
+  net.reset();
+  net.send({ t: 'join', code, name: getName(), watch: true });
 });
 $('#code').addEventListener('input', (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
 $('#lobby-add').addEventListener('click', () => net.send({ t: 'addBot' }));
